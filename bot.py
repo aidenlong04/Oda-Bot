@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import sys
+import time
 
 # Automatically install requirements if missing
 def ensure_requirements():
@@ -36,7 +37,6 @@ class OdaBot(discord.Client):
     async def on_message(self, message):
         if message.author.bot:
             return
-        import time
         now = time.time()
         cooldown_key = 'global'
         if cooldown_key in self.oda_cooldown:
