@@ -1,0 +1,14 @@
+[Unit]
+Description=Oda Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/workspaces/Oda-Bot
+ExecStart=/usr/bin/python3 /workspaces/Oda-Bot/bot.py
+Restart=always
+RestartSec=5
+User=your-linux-username
+
+[Install]
+WantedBy=multi-user.target
