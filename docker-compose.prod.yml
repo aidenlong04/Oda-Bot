@@ -13,18 +13,25 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Logging configuration
+    # Logging configuration for production
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
-    # Resource limits (optional - uncomment if needed)
-    # deploy:
-    #   resources:
-    #     limits:
-    #       memory: 128M
-    #       cpus: '0.5'
-    #     reservations:
-    #       memory: 64M
-    #       cpus: '0.25'
+        max-size: "50m"
+        max-file: "5"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '1.0'
+        reservations:
+          memory: 128M
+          cpus: '0.5'
+    # Networks for isolation
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
