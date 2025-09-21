@@ -1,0 +1,35 @@
+[Unit]
+Description=Oda Discord Bot
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# Update these paths to match your installation
+WorkingDirectory=/opt/oda-bot
+ExecStart=/usr/bin/python3 /opt/oda-bot/bot.py
+Restart=always
+RestartSec=10
+# Update this to match your user
+User=oda-bot
+Group=oda-bot
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/oda-bot/logs
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# Resource limits
+MemoryLimit=256M
+CPUQuota=50%
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
