@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  oda-bot:
+    build: .
+    container_name: oda-bot
+    env_file:
+      - .env
+    restart: unless-stopped
+    network_mode: bridge
