@@ -1,0 +1,34 @@
+name: Deploy Oda-Bot
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Deploy to Azure VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            mkdir -p /home/deploy/Oda-Bot
+            cd /home/deploy/Oda-Bot
+
+            if [ -d .git ]; then
+              git reset --hard
+              git pull origin main
+            else
+              git clone https://github.com/${{ github.repository }} .
+            fi
+
+            export DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+            docker compose down || true
+            docker compose up -d --build
