@@ -39,16 +39,50 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
-    if: ${{ secrets.AZURE_CREDENTIALS }}
     steps:
+      - name: Set AZURE_CREDENTIALS env
+        run: echo "AZURE_CREDENTIALS=${{ secrets.AZURE_CREDENTIALS }}" >> $GITHUB_ENV
+
+      - name: Set AZURE_RESOURCE_GROUP env
+        run: echo "AZURE_RESOURCE_GROUP=${{ secrets.AZURE_RESOURCE_GROUP }}" >> $GITHUB_ENV
+
+      - name: Set AZURE_LOCATION env
+        run: echo "AZURE_LOCATION=${{ secrets.AZURE_LOCATION }}" >> $GITHUB_ENV
+
+      - name: Preflight: validate Azure and deploy settings
+        run: |
+          echo "Running preflight checks..."
+          missing=0
+          if [ -z "${AZURE_RESOURCE_GROUP:-}" ]; then
+            echo "::error::AZURE_RESOURCE_GROUP is not set"
+            missing=1
+          fi
+          if [ -z "${AZURE_LOCATION:-}" ]; then
+            echo "::error::AZURE_LOCATION is not set"
+            missing=1
+          fi
+          if [ -z "${ACI_NAME:-}" ]; then
+            echo "::warning::ACI_NAME not set; defaulting to 'oda-bot'"
+            ACI_NAME="oda-bot"
+          fi
+          if [ -z "${AZURE_CREDENTIALS:-}" ] && [ -z "${AZURE_KEY_VAULT_NAME:-}" ] && [ -z "${ODA_DISCORD_TOKEN:-}" ]; then
+            echo "::error::No AZURE_CREDENTIALS and no Key Vault/ODA_DISCORD_TOKEN provided — cannot deploy"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "Preflight failed; see errors above. If you want to skip deploy, add the necessary secrets or update the workflow."
+            exit 1
+          fi
+
       - name: 'Login to Azure'
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Create resource group (if needed)
         run: |
-          az group create --name "${{ secrets.AZURE_RESOURCE_GROUP }}" --location "${{ secrets.AZURE_LOCATION }}"
+          az group create --name "$AZURE_RESOURCE_GROUP" --location "$AZURE_LOCATION"
 
       - name: Create/Update Azure Container Instance
         env:
@@ -65,8 +99,8 @@ jobs:
           fi
 
           az container create \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --name "${{ secrets.ACI_NAME }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$ACI_NAME" \
             --image "$GHCR_IMAGE" \
             --cpu 0.5 --memory 1.5 \
             --restart-policy Always \
@@ -74,3 +108,4 @@ jobs:
             --registry-username "${{ github.actor }}" \
             --registry-password "${{ secrets.GITHUB_TOKEN }}" \
             --environment-variables DISCORD_TOKEN="$DISCORD_TOKEN"
+ 
