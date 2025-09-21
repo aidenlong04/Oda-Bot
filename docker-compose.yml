@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    restart: unless-stopped
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.getenv('DISCORD_TOKEN') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Resource limits (optional - uncomment if needed)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 128M
+    #       cpus: '0.5'
+    #     reservations:
+    #       memory: 64M
+    #       cpus: '0.25'
