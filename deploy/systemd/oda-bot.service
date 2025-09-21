@@ -1,0 +1,19 @@
+[Unit]
+Description=Oda-Bot (Docker)
+After=network.target docker.service
+
+[Service]
+Restart=always
+RestartSec=5s
+# Adjust the User/Group as appropriate for your host
+User=root
+Group=root
+
+# Ensure Docker is available
+ExecStartPre=-/usr/bin/docker rm -f oda-bot
+ExecStart=/usr/bin/docker run --name oda-bot --env-file /etc/oda-bot/.env \
+  --restart unless-stopped ghcr.io/%h/oda-bot:latest
+ExecStop=/usr/bin/docker stop oda-bot
+
+[Install]
+WantedBy=multi-user.target

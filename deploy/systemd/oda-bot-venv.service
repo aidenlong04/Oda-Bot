@@ -1,0 +1,20 @@
+[Unit]
+Description=Oda-Bot (Python venv)
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+# Run as a non-root user where possible
+User=oda
+Group=oda
+
+# Path to your virtualenv's python and the repo install path must be adjusted
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/opt/oda-bot
+ExecStart=/opt/oda-bot/venv/bin/python /opt/oda-bot/oda_bot.py
+ExecStop=/bin/kill $MAINPID
+
+[Install]
+WantedBy=multi-user.target
