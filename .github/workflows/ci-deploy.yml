@@ -5,11 +5,72 @@ on:
     branches: [ main ]
 
 jobs:
-  minimal-check:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Print hello
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/oda-bot:latest
+
+  deploy-to-aci:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ secrets.AZURE_CREDENTIALS }}
+    steps:
+      - name: 'Login to Azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create resource group (if needed)
         run: |
-          echo "ci-deploy: minimal workflow run"
+          az group create --name "${{ secrets.AZURE_RESOURCE_GROUP }}" --location "${{ secrets.AZURE_LOCATION }}"
+
+      - name: Create/Update Azure Container Instance
+        env:
+          GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/oda-bot:latest
+        run: |
+          set -euo pipefail
+          if [ -n "${{ secrets.AZURE_KEY_VAULT_NAME }}" ] && [ -n "${{ secrets.AZURE_KEY_VAULT_SECRET_NAME }}" ]; then
+            echo "Retrieving DISCORD_TOKEN from Key Vault: ${{ secrets.AZURE_KEY_VAULT_NAME }}"
+            DISCORD_TOKEN=$(az keyvault secret show --vault-name "${{ secrets.AZURE_KEY_VAULT_NAME }}" --name "${{ secrets.AZURE_KEY_VAULT_SECRET_NAME }}" --query value -o tsv)
+            echo "::add-mask::$DISCORD_TOKEN"
+          else
+            echo "Key Vault not configured; using ODA_DISCORD_TOKEN repo secret"
+            DISCORD_TOKEN="${{ secrets.ODA_DISCORD_TOKEN }}"
+          fi
+
+          az container create \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ secrets.ACI_NAME }}" \
+            --image "$GHCR_IMAGE" \
+            --cpu 0.5 --memory 1.5 \
+            --restart-policy Always \
+            --registry-login-server ghcr.io \
+            --registry-username "${{ github.actor }}" \
+            --registry-password "${{ secrets.GITHUB_TOKEN }}" \
+            --environment-variables DISCORD_TOKEN="$DISCORD_TOKEN"
