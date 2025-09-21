@@ -35,77 +35,76 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/oda-bot:latest
 
-  deploy-to-aci:
+  optional-deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production
+    if: secrets.DEPLOY_HOST
     steps:
-      - name: Set AZURE_CREDENTIALS env
-        run: echo "AZURE_CREDENTIALS=${{ secrets.AZURE_CREDENTIALS }}" >> $GITHUB_ENV
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
 
-      - name: Set AZURE_RESOURCE_GROUP env
-        run: echo "AZURE_RESOURCE_GROUP=${{ secrets.AZURE_RESOURCE_GROUP }}" >> $GITHUB_ENV
-
-      - name: Set AZURE_LOCATION env
-        run: echo "AZURE_LOCATION=${{ secrets.AZURE_LOCATION }}" >> $GITHUB_ENV
-
-      - name: Preflight: validate Azure and deploy settings
+      - name: Setup SSH key
         run: |
-          echo "Running preflight checks..."
-          missing=0
-          if [ -z "${AZURE_RESOURCE_GROUP:-}" ]; then
-            echo "::error::AZURE_RESOURCE_GROUP is not set"
-            missing=1
-          fi
-          if [ -z "${AZURE_LOCATION:-}" ]; then
-            echo "::error::AZURE_LOCATION is not set"
-            missing=1
-          fi
-          if [ -z "${ACI_NAME:-}" ]; then
-            echo "::warning::ACI_NAME not set; defaulting to 'oda-bot'"
-            ACI_NAME="oda-bot"
-          fi
-          if [ -z "${AZURE_CREDENTIALS:-}" ] && [ -z "${AZURE_KEY_VAULT_NAME:-}" ] && [ -z "${ODA_DISCORD_TOKEN:-}" ]; then
-            echo "::error::No AZURE_CREDENTIALS and no Key Vault/ODA_DISCORD_TOKEN provided — cannot deploy"
-            missing=1
-          fi
-          if [ "$missing" -ne 0 ]; then
-            echo "Preflight failed; see errors above. If you want to skip deploy, add the necessary secrets or update the workflow."
-            exit 1
-          fi
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-      - name: 'Login to Azure'
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        uses: azure/login@v1
+      - name: Deploy via SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "docker pull ghcr.io/${{ github.repository_owner }}/oda-bot:latest && docker stop oda-bot || true && docker rm oda-bot || true && docker run -d --name oda-bot --env-file /path/to/.env ghcr.io/${{ github.repository_owner }}/oda-bot:latest"
+name: CI & Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create resource group (if needed)
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/oda-bot:latest
+
+  optional-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: secrets.DEPLOY_HOST
+    steps:
+      - name: Install SSH client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+      - name: Setup SSH key
         run: |
-          az group create --name "$AZURE_RESOURCE_GROUP" --location "$AZURE_LOCATION"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-      - name: Create/Update Azure Container Instance
-        env:
-          GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/oda-bot:latest
+      - name: Deploy via SSH
         run: |
-          set -euo pipefail
-          if [ -n "${{ secrets.AZURE_KEY_VAULT_NAME }}" ] && [ -n "${{ secrets.AZURE_KEY_VAULT_SECRET_NAME }}" ]; then
-            echo "Retrieving DISCORD_TOKEN from Key Vault: ${{ secrets.AZURE_KEY_VAULT_NAME }}"
-            DISCORD_TOKEN=$(az keyvault secret show --vault-name "${{ secrets.AZURE_KEY_VAULT_NAME }}" --name "${{ secrets.AZURE_KEY_VAULT_SECRET_NAME }}" --query value -o tsv)
-            echo "::add-mask::$DISCORD_TOKEN"
-          else
-            echo "Key Vault not configured; using ODA_DISCORD_TOKEN repo secret"
-            DISCORD_TOKEN="${{ secrets.ODA_DISCORD_TOKEN }}"
-          fi
-
-          az container create \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$ACI_NAME" \
-            --image "$GHCR_IMAGE" \
-            --cpu 0.5 --memory 1.5 \
-            --restart-policy Always \
-            --registry-login-server ghcr.io \
-            --registry-username "${{ github.actor }}" \
-            --registry-password "${{ secrets.GITHUB_TOKEN }}" \
-            --environment-variables DISCORD_TOKEN="$DISCORD_TOKEN"
- 
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "docker pull ghcr.io/${{ github.repository_owner }}/oda-bot:latest && docker stop oda-bot || true && docker rm oda-bot || true && docker run -d --name oda-bot --env-file /path/to/.env ghcr.io/${{ github.repository_owner }}/oda-bot:latest"
