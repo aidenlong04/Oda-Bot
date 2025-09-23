@@ -1,12 +1,3 @@
-version: "3.8"
-
-services:
-  oda-bot:
-    build: .
-    container_name: oda-bot
-    restart: always
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
 version: '3.8'
 services:
   oda-bot:

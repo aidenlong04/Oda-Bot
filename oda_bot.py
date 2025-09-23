@@ -90,24 +90,7 @@ class OdaBot(discord.Client):
 
     async def on_ready(self):
         print(f"Logged in as {self.user}")
-        # Prefer guild-scoped sync for immediate command registration during testing.
-        guild_id = os.getenv("GUILD_ID")
-        try:
-            if guild_id:
-                try:
-                    gid = int(guild_id)
-                    await self.tree.sync(guild=discord.Object(id=gid))
-                    print(f"Synced app commands to guild {gid}")
-                except Exception as e:
-                    print(f"Failed to sync to guild {guild_id}: {e}")
-                    # Fallback to global sync
-                    await self.tree.sync()
-                    print("Synced global app commands (fallback)")
-            else:
-                await self.tree.sync()
-                print("Synced global app commands")
-        except Exception as e:
-            print(f"Error syncing app commands: {e}")
+        await self.tree.sync()
 
     async def on_message(self, message):
         if message.author.bot:
@@ -278,51 +261,6 @@ async def sync_ign(interaction: discord.Interaction, channel: discord.TextChanne
         # set branded thumbnail at right corner
         embed.set_thumbnail(url="https://ik.imagekit.io/qcxbyrkgu/Golden_Pagoda_Emblem-clear.png?updatedAt=1752791247987")
         await interaction.followup.send(embed=embed, ephemeral=True)
-    
-@bot.tree.command(name="change_role", description="Find users with a specific role and change it to another role.")
-async def change_role(interaction: discord.Interaction, find_role: str, new_role: str):
-    # Permission check: only users with Administrator may run this command
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("You do not have permission to run this command.", ephemeral=True)
-        return
-    try:
-        await interaction.response.defer(ephemeral=True, thinking=True)
-    except (discord.NotFound, discord.HTTPException):
-        pass
-    guild = interaction.guild
-    if not guild:
-        await interaction.response.send_message("This command must be run in a server.", ephemeral=True)
-        return
-    # Find roles by name (case-insensitive)
-    find_role_obj = discord.utils.find(lambda r: r.name.lower() == find_role.lower(), guild.roles)
-    new_role_obj = discord.utils.find(lambda r: r.name.lower() == new_role.lower(), guild.roles)
-    if not find_role_obj:
-        await interaction.response.send_message(f"Role '{find_role}' not found.", ephemeral=True)
-        return
-    if not new_role_obj:
-        await interaction.response.send_message(f"Role '{new_role}' not found.", ephemeral=True)
-        return
-    # Find members with the role
-    members = [m for m in guild.members if find_role_obj in m.roles]
-    if not members:
-        await interaction.response.send_message(f"No members found with role '{find_role}'.", ephemeral=True)
-        return
-    changed = []
-    failed = []
-    for member in members:
-        try:
-            await member.remove_roles(find_role_obj, reason=f"Changed by {interaction.user} via bot command")
-            await member.add_roles(new_role_obj, reason=f"Changed by {interaction.user} via bot command")
-            changed.append(member.display_name)
-        except Exception as e:
-            failed.append(f"{member.display_name}: {e}")
-    embed = discord.Embed(title="Role Change Results", color=0xD4AF36)
-    embed.description = f"Changed role for {len(changed)} member{'s' if len(changed) != 1 else ''}."
-    if changed:
-        embed.add_field(name="Updated Members", value=_build_truncated_field(changed, joiner="\n"), inline=False)
-    if failed:
-        embed.add_field(name="Failed", value=_build_truncated_field(failed, joiner="\n"), inline=False)
-    await interaction.followup.send(embed=embed, ephemeral=True)
 
 # Main
 if __name__ == "__main__":
