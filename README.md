@@ -138,7 +138,14 @@ You can also manage the bot directly in Docker Desktop:
 - Make sure your Discord token is correct in the `.env` file
 - Ensure Docker Desktop is running before executing docker commands
 
-For advanced deployment options and CI/CD setup, see [README_DOCKER.md](README_DOCKER.md).
+### CI/CD Deployment
+
+The repository includes a GitHub Actions workflow (`.github/workflows/ci-deploy.yml`) that automatically builds and pushes the Docker image to GitHub Container Registry on pushes to `main`.
+
+For optional remote deployment via SSH, set these repository secrets in GitHub:
+- `DEPLOY_HOST` - remote host address
+- `DEPLOY_USER` - SSH username
+- `DEPLOY_KEY` - private SSH key contents
 
 ## License
 

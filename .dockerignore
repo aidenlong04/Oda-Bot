@@ -5,7 +5,6 @@
 
 # Documentation
 README.md
-README_DOCKER.md
 
 # CI/CD
 .github
@@ -36,6 +35,3 @@ build
 # OS
 .DS_Store
 Thumbs.db
-
-# Deployment scripts
-deploy/
