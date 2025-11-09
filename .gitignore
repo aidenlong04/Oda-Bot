@@ -5,9 +5,6 @@
 __pycache__/
 *.py[cod]
 
-# Docker ignore file
-.dockerignore
-
 # VS Code
 .vscode/
 
