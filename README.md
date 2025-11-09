@@ -6,6 +6,25 @@ A Discord bot for server management and community engagement.
 
 **GitHub Repository:** [https://github.com/aidenlong04/Oda-Bot](https://github.com/aidenlong04/Oda-Bot)
 
+### Download Options
+
+**Option 1: Using GitHub Desktop**
+1. Click the green "Code" button on the [repository page](https://github.com/aidenlong04/Oda-Bot)
+2. Select "Open with GitHub Desktop"
+3. Choose a local path to save the repository
+4. GitHub Desktop will clone the repository for you
+
+**Option 2: Direct Download (ZIP)**
+1. Click the green "Code" button on the [repository page](https://github.com/aidenlong04/Oda-Bot)
+2. Select "Download ZIP"
+3. Extract the ZIP file to your desired location
+
+**Option 3: Git Command Line**
+```bash
+git clone https://github.com/aidenlong04/Oda-Bot.git
+cd Oda-Bot
+```
+
 ## Features
 
 - **Ordis Jokes** - Get random jokes from Ordis with the `/pun` command
@@ -21,28 +40,36 @@ A Discord bot for server management and community engagement.
 
 ## Setup
 
-1. Clone the repository:
+### Prerequisites
+- Python 3.12 or higher (for local installation)
+- Docker Desktop (for Docker installation)
+- A Discord bot token from the [Discord Developer Portal](https://discord.com/developers/applications)
+
+### Local Installation
+
+1. **Download the repository** (see [Download Options](#download-options) above)
+
+2. Navigate to the repository folder:
    ```bash
-   git clone https://github.com/aidenlong04/Oda-Bot.git
    cd Oda-Bot
    ```
 
-2. Create a `.env` file from the example:
+3. Create a `.env` file from the example:
    ```bash
    cp .env.example .env
    ```
 
-3. Add your Discord bot token to the `.env` file:
+4. Add your Discord bot token to the `.env` file:
    ```
    DISCORD_TOKEN=your_token_here
    ```
 
-4. Install dependencies:
+5. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-5. Run the bot:
+6. Run the bot:
    ```bash
    python oda_bot.py
    ```
@@ -55,13 +82,14 @@ A Discord bot for server management and community engagement.
 
 ### Step-by-Step Instructions
 
-1. **Clone the repository:**
+1. **Download the repository** (see [Download Options](#download-options) above)
+
+2. **Navigate to the repository folder:**
    ```bash
-   git clone https://github.com/aidenlong04/Oda-Bot.git
    cd Oda-Bot
    ```
 
-2. **Create your environment file:**
+3. **Create your environment file:**
    - Copy `.env.example` to `.env`:
      ```bash
      cp .env.example .env
@@ -71,11 +99,11 @@ A Discord bot for server management and community engagement.
      DISCORD_TOKEN=your_actual_discord_token_here
      ```
 
-3. **Start Docker Desktop:**
+4. **Start Docker Desktop:**
    - Open Docker Desktop application on your computer
    - Wait for it to fully start (the Docker icon should show "running")
 
-4. **Build and run the bot:**
+5. **Build and run the bot:**
    ```bash
    docker compose up --build -d
    ```
@@ -84,13 +112,13 @@ A Discord bot for server management and community engagement.
    - Start the container in detached mode (runs in background)
    - The bot will automatically restart if it crashes
 
-5. **View the bot logs:**
+6. **View the bot logs:**
    ```bash
    docker compose logs -f oda-bot
    ```
    Press `Ctrl+C` to exit the logs view
 
-6. **Stop the bot:**
+7. **Stop the bot:**
    ```bash
    docker compose down
    ```
