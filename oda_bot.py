@@ -64,6 +64,74 @@ def sanitize_nickname(raw: str, max_length: int = 32) -> str:
         s = s[:max_length].strip()
     return s
 
+def _normalize_text(text: str) -> str:
+    """Normalize text for spam detection: strip special characters between letters,
+    collapse whitespace, and lowercase. This defeats common evasion tactics like
+    j.o.i.n or j*o*i*n or j-o-i-n."""
+    s = text.lower()
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')
+    leet_map = {
+        '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's',
+        '7': 't', '@': 'a', '$': 's', '!': 'i',
+    }
+    s = ''.join(leet_map.get(ch, ch) for ch in s)
+    s = re.sub(r'(?<=\w)[^\w\s]+(?=\w)', '', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
+# Compiled spam / server-advertisement regex patterns.
+SPAM_PATTERNS: list[re.Pattern] = [
+    re.compile(
+        r'(?:come\s+)?join\s+(?:my|our)\s+(?:\w+\s+){0,3}'
+        r'(?:server|discord|community|guild)',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'(?:anyone|who|somebody|anybody)\s+'
+        r'(?:want|wanna|wants)\s+(?:to\s+)?join',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'check\s*out\s+(?:my|our)\s+(?:\w+\s+){0,3}'
+        r'(?:server|discord|community|guild)',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'join\s+us\s+(?:at|on|in)\b',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'(?:growing|brand\s*new|new|chill|active|friendly)\s+'
+        r'(?:\w+\s+){0,2}(?:server|discord|community|guild)',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'looking\s+for\s+(?:new\s+)?(?:members|people|players|staff)',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'discord(?:\.gg|\.com/invite)/\S+',
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r'(?=.*\bjoin\b)(?=.*\bserver\b)',
+        re.IGNORECASE,
+    ),
+]
+
+
+def is_advertisement(text: str) -> bool:
+    """Return True if *text* matches any known server-advertisement pattern.
+    Discord invite links are checked against the raw text before normalization."""
+    raw_lower = text.lower()
+    if re.search(r'discord(?:\.gg|\.com/invite)/\S+', raw_lower):
+        return True
+    cleaned = _normalize_text(text)
+    return any(pat.search(cleaned) for pat in SPAM_PATTERNS)
+
+
 # Automatically install requirements if missing
 def ensure_requirements():
     try:
@@ -95,6 +163,22 @@ class OdaBot(discord.Client):
     async def on_message(self, message):
         if message.author.bot:
             return
+
+        # --- Server-advertisement / spam filter ---
+        if message.guild and not message.author.guild_permissions.manage_messages:
+            if is_advertisement(message.content):
+                try:
+                    await message.delete()
+                    print(
+                        f"Deleted advertisement from {message.author} "
+                        f"in #{message.channel}: {message.content[:80]!r}"
+                    )
+                except discord.Forbidden:
+                    pass
+                except discord.NotFound:
+                    pass
+                return
+
         import time
         now = time.time()
         cooldown_key = 'global'

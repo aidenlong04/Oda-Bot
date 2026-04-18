@@ -71,11 +71,97 @@ def sanitize_nickname(raw: str, max_length: int = 32) -> str:
     s = unicodedata.normalize('NFKD', s)
     s = ''.join(ch for ch in s if not unicodedata.category(ch).startswith('C'))
     s = ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')
-    s = re.sub(r"[FE0EFE0F200D200B]", "", s)
+    s = re.sub(r"[\uFE0E\uFE0F\u200D\u200B]", "", s)
     s = re.sub(r"\s+", " ", s).strip()
     if len(s) > max_length:
         s = s[:max_length].strip()
     return s
+
+def _normalize_text(text: str) -> str:
+    """Normalize text for spam detection: strip special characters between letters,
+    collapse whitespace, and lowercase. This defeats common evasion tactics like
+    j.o.i.n or j*o*i*n or j-o-i-n."""
+    # Lowercase first
+    s = text.lower()
+    # Normalize unicode to NFKD and strip combining marks
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')
+    # Replace common leet-speak substitutions
+    leet_map = {
+        '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's',
+        '7': 't', '@': 'a', '$': 's', '!': 'i',
+    }
+    s = ''.join(leet_map.get(ch, ch) for ch in s)
+    # Remove non-alphanumeric chars between word characters (defeats j.o.i.n style evasion)
+    s = re.sub(r'(?<=\w)[^\w\s]+(?=\w)', '', s)
+    # Collapse whitespace
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
+# Compiled spam / server-advertisement regex patterns.
+# These run against _normalize_text() output so special-char evasion is already stripped.
+# Each pattern uses (?= ) lookaheads where helpful to allow overlapping matches.
+SPAM_PATTERNS: list[re.Pattern] = [
+    # "join my/our server/discord/community"
+    re.compile(
+        r'(?:come\s+)?join\s+(?:my|our)\s+(?:\w+\s+){0,3}'
+        r'(?:server|discord|community|guild)',
+        re.IGNORECASE,
+    ),
+    # "anyone/who wants to join" (solicitation)
+    re.compile(
+        r'(?:anyone|who|somebody|anybody)\s+'
+        r'(?:want|wanna|wants)\s+(?:to\s+)?join',
+        re.IGNORECASE,
+    ),
+    # "check out my/our server/discord"
+    re.compile(
+        r'check\s*out\s+(?:my|our)\s+(?:\w+\s+){0,3}'
+        r'(?:server|discord|community|guild)',
+        re.IGNORECASE,
+    ),
+    # "join us at/on/in" (direct invite)
+    re.compile(
+        r'join\s+us\s+(?:at|on|in)\b',
+        re.IGNORECASE,
+    ),
+    # "growing/new/chill/active server|community" (advertisement descriptors)
+    re.compile(
+        r'(?:growing|brand\s*new|new|chill|active|friendly)\s+'
+        r'(?:\w+\s+){0,2}(?:server|discord|community|guild)',
+        re.IGNORECASE,
+    ),
+    # "looking for members/people/players"
+    re.compile(
+        r'looking\s+for\s+(?:new\s+)?(?:members|people|players|staff)',
+        re.IGNORECASE,
+    ),
+    # discord.gg or discord.com/invite links
+    re.compile(
+        r'discord(?:\.gg|\.com/invite)/\S+',
+        re.IGNORECASE,
+    ),
+    # Lookahead combo: message contains BOTH "server" and "join" anywhere
+    # This catches reordered phrases like "my server – come join!"
+    re.compile(
+        r'(?=.*\bjoin\b)(?=.*\bserver\b)',
+        re.IGNORECASE,
+    ),
+]
+
+
+def is_advertisement(text: str) -> bool:
+    """Return True if *text* matches any known server-advertisement pattern.
+    The text is first normalized to defeat special-character and leet-speak evasion.
+    Discord invite links are checked against the raw text before normalization."""
+    # Check invite links against raw (lowered) text before normalization strips punctuation
+    raw_lower = text.lower()
+    if re.search(r'discord(?:\.gg|\.com/invite)/\S+', raw_lower):
+        return True
+    cleaned = _normalize_text(text)
+    return any(pat.search(cleaned) for pat in SPAM_PATTERNS)
+
 
 def ensure_requirements():
     """Automatically install requirements if missing"""
@@ -130,8 +216,26 @@ class OdaBot(commands.Bot):
     async def on_message(self, message):
         if message.author.bot:
             return
+
+        # --- Server-advertisement / spam filter ---
+        # Skip the check for users with Manage Messages permission (moderators/admins)
+        if message.guild and not message.author.guild_permissions.manage_messages:
+            if is_advertisement(message.content):
+                try:
+                    await message.delete()
+                    logger.info(
+                        f"Deleted advertisement from {message.author} "
+                        f"in #{message.channel}: {message.content[:80]!r}"
+                    )
+                except discord.Forbidden:
+                    logger.warning(
+                        f"Missing permissions to delete ad message in #{message.channel}"
+                    )
+                except discord.NotFound:
+                    pass  # Already deleted
+                return  # Don't process commands for deleted spam
+
         await self.process_commands(message)
-        # Entire Oda response gif logic and all references have been removed
 
 bot = OdaBot()
 
