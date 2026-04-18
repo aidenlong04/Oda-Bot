@@ -112,11 +112,7 @@ SPAM_PATTERNS: list[re.Pattern] = [
         re.IGNORECASE,
     ),
     re.compile(
-        r'discord(?:\.gg|\.com/invite)/\S+',
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r'(?=.*\bjoin\b)(?=.*\bserver\b)',
+        r'\bjoin\b.{0,30}\bserver\b|\bserver\b.{0,30}\bjoin\b',
         re.IGNORECASE,
     ),
 ]
@@ -174,7 +170,9 @@ class OdaBot(discord.Client):
                         f"in #{message.channel}: {message.content[:80]!r}"
                     )
                 except discord.Forbidden:
-                    pass
+                    print(
+                        f"Missing permissions to delete ad message in #{message.channel}"
+                    )
                 except discord.NotFound:
                     pass
                 return

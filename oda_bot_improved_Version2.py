@@ -137,15 +137,10 @@ SPAM_PATTERNS: list[re.Pattern] = [
         r'looking\s+for\s+(?:new\s+)?(?:members|people|players|staff)',
         re.IGNORECASE,
     ),
-    # discord.gg or discord.com/invite links
-    re.compile(
-        r'discord(?:\.gg|\.com/invite)/\S+',
-        re.IGNORECASE,
-    ),
-    # Lookahead combo: message contains BOTH "server" and "join" anywhere
+    # Lookahead combo: message contains BOTH "server" and "join" within proximity
     # This catches reordered phrases like "my server – come join!"
     re.compile(
-        r'(?=.*\bjoin\b)(?=.*\bserver\b)',
+        r'\bjoin\b.{0,30}\bserver\b|\bserver\b.{0,30}\bjoin\b',
         re.IGNORECASE,
     ),
 ]
